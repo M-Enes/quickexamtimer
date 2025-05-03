@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Countdown</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Final Exam Countdown</h1>
+
+    <div class="controls">
+        <button id="show-import-ui-btn">Manage Schedule / Import</button>
+    </div>
+
+    <div class="import-controls" style="display: none;">
+        <label for="json-paste-area">Paste JSON here:</label>
+        <textarea id="json-paste-area" rows="5" placeholder="[&#10;  { &quot;code&quot;: &quot;CENG101&quot;, &quot;name&quot;: &quot;Intro...&quot; }&#10;]"></textarea>
+        <button id="import-pasted-json-btn">Import Pasted JSON</button>
+        <button id="reset-exams-btn">Remove Schedule</button>
+    </div>
+
+    <div class="llm-prompt-section" style="display: none;">
+        <details>
+            <summary>Need help creating the JSON file? Click here for an LLM prompt.</summary>
+            <div class="prompt-content">
+                <p>You can use the following prompt with an AI assistant (like ChatGPT, Claude, Gemini, etc.) to help convert your schedule into the required JSON format. Copy the entire text below, paste your schedule where indicated, and then give it to the AI.</p>
+                <pre id="llm-prompt-text"></pre>
+                <button id="copy-prompt-btn">Copy Prompt</button>
+            </div>
+        </details>
+    </div>
+
+    <div id="countdown-container">
+        <!-- Countdown timers will be inserted here by JavaScript -->
+    </div>
+
+    <!-- Exam Selection Modal -->
+    <div id="selection-modal" class="modal">
+        <div class="modal-content">
+            <h2>Select Your Exams</h2>
+            <p>Please select the exams you are taking. This choice will be saved for this browser.</p>
+            <div id="exam-checkboxes">
+                <!-- Checkboxes will be inserted here by JavaScript -->
+            </div>
+            <button id="save-selection-btn">Save Selection</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
