@@ -8,27 +8,21 @@
 </head>
 <body>
     <h1>Final Exam Countdown</h1>
-
+    
+    
     <div class="controls">
         <button id="show-import-ui-btn">Manage Schedule / Import</button>
     </div>
+    
+
+    <div class="loader" id="file-loader" style="display: none;"></div>
+
 
     <div class="import-controls" style="display: none;">
-        <label for="json-paste-area">Paste JSON here:</label>
-        <textarea id="json-paste-area" rows="5" placeholder="[&#10;  { &quot;code&quot;: &quot;CENG101&quot;, &quot;name&quot;: &quot;Intro...&quot; }&#10;]"></textarea>
-        <button id="import-pasted-json-btn">Import Pasted JSON</button>
-        <button id="reset-exams-btn">Remove Schedule</button>
-    </div>
-
-    <div class="llm-prompt-section" style="display: none;">
-        <details>
-            <summary>Need help creating the JSON file? Click here for an LLM prompt.</summary>
-            <div class="prompt-content">
-                <p>You can use the following prompt with an AI assistant (like ChatGPT, Claude, Gemini, etc.) to help convert your schedule into the required JSON format. Copy the entire text below, paste your schedule where indicated, and then give it to the AI.</p>
-                <pre id="llm-prompt-text"></pre>
-                <button id="copy-prompt-btn">Copy Prompt</button>
-            </div>
-        </details>
+        <label for="import-exams-file">Import exams from file:</label>
+        <input type="file" id="import-exams-file" accept="application/pdf, image/*">
+        <button id="import-exams-file-btn">Import exams</button>
+        <button id="reset-exams-btn">Remove all exams</button>
     </div>
 
     <div id="countdown-container">
@@ -43,7 +37,8 @@
             <div id="exam-checkboxes">
                 <!-- Checkboxes will be inserted here by JavaScript -->
             </div>
-            <button id="save-selection-btn">Save Selection</button>
+            <button id="save-selection-btn">Save selection</button>
+            <input type="checkbox" id="check-all-exams"/><label for="check-all-exams">Check all</label>
         </div>
     </div>
 

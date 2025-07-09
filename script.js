@@ -5,52 +5,18 @@ const examCheckboxesContainer = document.getElementById('exam-checkboxes');
 const saveSelectionBtn = document.getElementById('save-selection-btn');
 // const fileImportInput = document.getElementById('import-file'); // REMOVED
 const resetExamsBtn = document.getElementById('reset-exams-btn'); // Note: May need to re-assign if multiple exist
-const jsonPasteArea = document.getElementById('json-paste-area');
-const importPastedJsonBtn = document.getElementById('import-pasted-json-btn');
-const llmPromptTextEl = document.getElementById('llm-prompt-text');
-const copyPromptBtn = document.getElementById('copy-prompt-btn');
+const importExamsFileBtn = document.getElementById('import-exams-file-btn'); // Button for importing exams from file
 const showImportUiBtn = document.getElementById('show-import-ui-btn');
 const importControlsDiv = document.querySelector('.import-controls'); // Get the div itself
-const llmPromptSectionDiv = document.querySelector('.llm-prompt-section'); // Get the div itself
+const importFileInput = document.getElementById('import-exams-file'); // File input for importing exams
+const checkAllExamsCheckbox = document.getElementById('check-all-exams'); // Checkbox to select all exams
+
 
 // Global variable to hold all fetched exams
 let allExams = [];
 let updateInterval = null;
 const CUSTOM_EXAMS_KEY = 'customExamsData';
 const SELECTED_EXAMS_KEY = 'selectedExams';
-
-// Default exam data (embedded instead of fetching exams.json)
-// const DEFAULT_EXAMS = [ ... ]; // REMOVED
-
-const LLM_PROMPT = `
-You are tasked with converting exam schedule information into a JSON format suitable for an exam countdown timer application.
-
-Format the extracted information as a JSON array.
-
-Each object in the JSON array represents a single exam and MUST have the following keys:
-- "code": A string representing the course code (e.g., "CENG101"). Use "UNKNOWN_CODE" if not found.
-- "name": A string representing the course name (e.g., "Introduction to Programming"). Use "UNKNOWN_NAME" if not found.
-- "date": A string representing the exam date strictly in DD.MM.YYYY format (e.g., "21.05.2025").
-- "time": A string representing the exam time strictly in HH:MM format using a 24-hour clock (e.g., "09:00" or "14:30").
-
-Optionally, include this key if the information is available:
-- "classes": A string representing the classroom(s) or location (e.g., "A101 / B203", "Online", or "N/A").
-
-Important Rules:
-- Extract information for ALL exams mentioned in the user's input.
-- Ensure the date and time formats (DD.MM.YYYY and HH:MM) are followed exactly.
-- If a date or time for a specific exam cannot be determined or formatted correctly, omit that specific exam entry from the final JSON, but include all others that are valid.
-- The final output MUST be ONLY the JSON array itself, starting with \`[\` and ending with \`]\`. Do not include any introductory text, explanations, apologies, or markdown formatting like \\\`\\\`\\\`json.\n
-Please find the user's exam schedule information below (either pasted directly or in an attached file):
-
---- START OF USER SCHEDULE ---
-
-[ *** PASTE your exam schedule text/table here OR just ATTACH the file *** ]
-
---- END OF USER SCHEDULE ---
-
-Generate the JSON array based on ALL the exam information provided and the rules above:
-`;
 
 // --- Date & Time Formatting ---
 function parseDate(dateStr, timeStr) {
@@ -108,8 +74,7 @@ function clearCustomExams() {
     allExams = [];
     // Do not automatically show selection modal here
     // Hide the import UI if it was open
-    importControlsDiv.style.display = 'none'; 
-    llmPromptSectionDiv.style.display = 'none';
+    importControlsDiv.style.display = 'none';
 }
 
 // --- File Import Logic ---
@@ -121,7 +86,7 @@ function handleFileImport(event) {
 
     const reader = new FileReader();
 
-    reader.onload = function(e) {
+    reader.onload = function (e) {
         try {
             const importedData = JSON.parse(e.target.result);
             // Basic validation: check if it's an array
@@ -129,15 +94,15 @@ function handleFileImport(event) {
                 throw new Error("Imported data is not a valid JSON array.");
             }
             // Deeper validation could be added here (check for required fields like code, name, date, time)
-            const isValid = importedData.every(exam => 
-                exam && typeof exam.code === 'string' && 
-                typeof exam.name === 'string' && 
-                typeof exam.date === 'string' && 
+            const isValid = importedData.every(exam =>
+                exam && typeof exam.code === 'string' &&
+                typeof exam.name === 'string' &&
+                typeof exam.date === 'string' &&
                 typeof exam.time === 'string'
                 // 'classes' field is optional
             );
             if (!isValid) {
-                 throw new Error("Imported data contains invalid exam entries.");
+                throw new Error("Imported data contains invalid exam entries.");
             }
 
             if (saveCustomExams(importedData)) {
@@ -153,83 +118,15 @@ function handleFileImport(event) {
             alert(`Error importing file: ${error.message}. Please ensure it's a valid JSON file with the correct format.`);
         }
         // Reset file input value so the same file can be re-selected if needed
-        event.target.value = null; 
+        event.target.value = null;
     };
 
-    reader.onerror = function() {
+    reader.onerror = function () {
         alert("Error reading file.");
-         event.target.value = null; 
+        event.target.value = null;
     };
 
     reader.readAsText(file);
-}
-
-// --- Paste Import Logic ---
-function handlePasteImport() {
-    let jsonString = jsonPasteArea.value.trim(); // Trim whitespace first
-    if (!jsonString) {
-        alert("Please paste the JSON data into the text area first.");
-        return;
-    }
-
-    // Attempt to clean common LLM artifacts (markdown code blocks)
-    if (jsonString.startsWith('```json') && jsonString.endsWith('```')) {
-        console.log("Cleaning ```json markdown...");
-        jsonString = jsonString.substring(7, jsonString.length - 3).trim();
-    } else if (jsonString.startsWith('```') && jsonString.endsWith('```')) {
-        console.log("Cleaning ``` markdown...");
-        jsonString = jsonString.substring(3, jsonString.length - 3).trim();
-    } else if (jsonString.startsWith('`') && jsonString.endsWith('`')) {
-        console.log("Cleaning single backticks...");
-        jsonString = jsonString.substring(1, jsonString.length - 1).trim();
-    }
-
-    // Clean potential leading backslash (after markdown cleaning)
-    if (jsonString.startsWith('\\')) { // Need to escape the backslash in the check
-        console.log("Cleaning leading backslash...");
-        jsonString = jsonString.substring(1);
-    }
-
-    // Ensure it looks like an array (basic check)
-    if (!jsonString.startsWith('[') || !jsonString.endsWith(']')) {
-        alert('Error: The pasted text does not appear to be a valid JSON array (must start with [ and end with ]). Please check the format.');
-        return;
-    }
-
-    try {
-        const importedData = JSON.parse(jsonString);
-        // Basic validation (same as file import)
-        if (!Array.isArray(importedData)) {
-            throw new Error("Pasted data is not a valid JSON array.");
-        }
-        const isValid = importedData.every(exam =>
-            exam && typeof exam.code === 'string' &&
-            typeof exam.name === 'string' &&
-            typeof exam.date === 'string' &&
-            typeof exam.time === 'string'
-            // 'classes' is optional
-        );
-         if (!isValid) {
-             throw new Error("Pasted data contains invalid exam entries (missing code, name, date, or time).");
-         }
-
-        if (saveCustomExams(importedData)) {
-            alert(`Successfully imported ${importedData.length} exams from pasted text. Please select your exams from the list.`);
-            allExams = importedData;
-            localStorage.removeItem(SELECTED_EXAMS_KEY);
-            if (updateInterval) clearInterval(updateInterval);
-            showSelectionModal();
-            jsonPasteArea.value = ''; // Clear the text area
-            // Hide the import UI after successful import
-            importControlsDiv.style.display = 'none';
-            llmPromptSectionDiv.style.display = 'none';
-        } else {
-             // saveCustomExams alerts if there's an issue
-        }
-    } catch (error) {
-        console.error("Failed to parse or validate pasted JSON:", error);
-        alert(`Error importing pasted data: ${error.message}. Please ensure it's valid JSON matching the required format.`);
-    }
 }
 
 // --- UI Interaction ---
@@ -250,7 +147,7 @@ function showSelectionModal() {
             label.appendChild(checkbox);
             label.appendChild(document.createTextNode(` ${exam.code} - ${exam.name} (${exam.date})`));
             examCheckboxesContainer.appendChild(label);
-    });
+        });
     selectionModal.style.display = 'block';
 }
 
@@ -282,13 +179,13 @@ function renderCountdowns() {
         .sort((a, b) => parseDate(a.date, a.time) - parseDate(b.date, b.time));
 
     if (selectedExamsData.length === 0 && selectedCodes.length > 0) {
-         // Selection exists, but no matching exams in current 'allExams' (could happen after import/reset)
-         countdownContainer.innerHTML = '<p>Your selection doesn\'t match the current exam list. Please <a href="#" onclick="showSelectionModal(); return false;">update your selection</a> or <a href="#" onclick="clearCustomExams(); return false;">reset to default</a>.</p>';
-         return;
+        // Selection exists, but no matching exams in current 'allExams' (could happen after import/reset)
+        countdownContainer.innerHTML = '<p>Your selection doesn\'t match the current exam list. Please <a href="#" onclick="showSelectionModal(); return false;">update your selection</a> or <a href="#" onclick="clearCustomExams(); return false;">reset to default</a>.</p>';
+        return;
     }
-     if (selectedExamsData.length === 0 && selectedCodes.length === 0) {
-         countdownContainer.innerHTML = '<p>No exams selected. Please <a href="#" onclick="showSelectionModal(); return false;">select your exams</a>.</p>';
-         return;
+    if (selectedExamsData.length === 0 && selectedCodes.length === 0) {
+        countdownContainer.innerHTML = '<p>No exams selected. Please <a href="#" onclick="showSelectionModal(); return false;">select your exams</a>.</p>';
+        return;
     }
 
     selectedExamsData.forEach(exam => {
@@ -358,49 +255,140 @@ function updateTimers() {
 }
 
 function startTimerUpdates() {
-     if (updateInterval) {
-         clearInterval(updateInterval);
-     }
-     const selectedCodes = getSelectedExams();
-     // Only start interval if there are selected exams
-     if (selectedCodes && selectedCodes.length > 0) {
+    if (updateInterval) {
+        clearInterval(updateInterval);
+    }
+    const selectedCodes = getSelectedExams();
+    // Only start interval if there are selected exams
+    if (selectedCodes && selectedCodes.length > 0) {
         updateTimers(); // Update immediately
         updateInterval = setInterval(updateTimers, 1000);
-     }
+    }
 }
 
-// --- Prompt Copy Logic ---
-function copyPromptToClipboard() {
-    navigator.clipboard.writeText(LLM_PROMPT)
-        .then(() => {
-            alert('LLM prompt copied to clipboard!');
-        })
-        .catch(err => {
-            console.error('Failed to copy prompt: ', err);
-            alert('Failed to copy prompt. You may need to copy it manually.');
-        });
+function importFromJSON(data) {
+    let jsonString = data.trim(); // Trim whitespace first
+    if (!jsonString) {
+        alert("Please paste the JSON data into the text area first.");
+        return;
+    }
+
+    // Attempt to clean common LLM artifacts (markdown code blocks)
+    if (jsonString.startsWith('```json') && jsonString.endsWith('```')) {
+        console.log("Cleaning ```json markdown...");
+        jsonString = jsonString.substring(7, jsonString.length - 3).trim();
+    } else if (jsonString.startsWith('```') && jsonString.endsWith('```')) {
+        console.log("Cleaning ``` markdown...");
+        jsonString = jsonString.substring(3, jsonString.length - 3).trim();
+    } else if (jsonString.startsWith('`') && jsonString.endsWith('`')) {
+        console.log("Cleaning single backticks...");
+        jsonString = jsonString.substring(1, jsonString.length - 1).trim();
+    }
+
+    // Clean potential leading backslash (after markdown cleaning)
+    if (jsonString.startsWith('\\')) { // Need to escape the backslash in the check
+        console.log("Cleaning leading backslash...");
+        jsonString = jsonString.substring(1);
+    }
+
+    // Ensure it looks like an array (basic check)
+    if (!jsonString.startsWith('[') || !jsonString.endsWith(']')) {
+        alert('Error: The pasted text does not appear to be a valid JSON array (must start with [ and end with ]). Please check the format.');
+        return;
+    }
+
+    try {
+        const importedData = JSON.parse(jsonString);
+        // Basic validation (same as file import)
+        if (!Array.isArray(importedData)) {
+            throw new Error("Pasted data is not a valid JSON array.");
+        }
+        const isValid = importedData.every(exam =>
+            exam && typeof exam.code === 'string' &&
+            typeof exam.name === 'string' &&
+            typeof exam.date === 'string' &&
+            typeof exam.time === 'string'
+            // 'classes' is optional
+        );
+         if (!isValid) {
+             throw new Error("Pasted data contains invalid exam entries (missing code, name, date, or time).");
+         }
+
+        if (saveCustomExams(importedData)) {
+            alert(`Successfully imported ${importedData.length} exams from pasted text. Please select your exams from the list.`);
+            allExams = importedData;
+            localStorage.removeItem(SELECTED_EXAMS_KEY);
+            if (updateInterval) clearInterval(updateInterval);
+            showSelectionModal();
+            // Hide the import UI after successful import
+            importControlsDiv.style.display = 'none';
+        } else {
+             // saveCustomExams alerts if there's an issue
+        }
+    } catch (error) {
+        console.error("Failed to parse or validate pasted JSON:", error);
+        alert(`Error importing pasted data: ${error.message}. Please ensure it's valid JSON matching the required format.`);
+    }
+}
+
+function handleFileImport() {
+    {
+        const reader = new FileReader();
+
+        reader.onload = function () {
+            const fileType = reader.result.split(';')[0].split(':')[1];
+
+            if (fileType !== 'image/png' && fileType !== 'image/jpeg' && fileType !== 'application/pdf') {
+                alert("Unsupported file type. Please upload a PNG, JPEG, or PDF file.");
+                return;
+            }
+
+
+            const base64String = reader.result.split(',')[1];
+
+            document.getElementById('file-loader').style.display = 'flex';
+            let schedule = fetch('https://withered-dream-b89c.eneskaracap.workers.dev/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ file: base64String , fileType: fileType })
+            }).then(schedule =>
+                schedule.text().then(data => {
+                    if(data === 'error') {
+                        alert("Error processing the file. Please ensure it's a valid exam schedule.");
+                        document.getElementById('file-loader').style.display = 'none';
+                        return;
+                    }
+                    document.getElementById('file-loader').style.display= 'none';
+                    importFromJSON(data);
+                }));
+        };
+
+        reader.readAsDataURL(importFileInput.files[0]);
+    }
+}
+
+
+function markAllExamsForSelection(){
+    const checkboxes = examCheckboxesContainer.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = checkAllExamsCheckbox.checked);
 }
 
 // --- Initialization ---
 async function initialize() {
-    // Populate the LLM prompt text area
-    if (llmPromptTextEl) {
-         llmPromptTextEl.textContent = LLM_PROMPT;
-    }
     // Add event listeners
     showImportUiBtn.addEventListener('click', toggleImportUI);
     // Ensure correct reset button is targeted if multiple exist, assuming the one in import-controls is the relevant one now
     const resetButtonInImport = importControlsDiv.querySelector('#reset-exams-btn');
-    if(resetButtonInImport) {
-       resetButtonInImport.addEventListener('click', clearCustomExams);
+    if (resetButtonInImport) {
+        resetButtonInImport.addEventListener('click', clearCustomExams);
     } else {
         console.warn("Could not find reset button inside import controls.");
         // Fallback or handle error if needed
     }
-    importPastedJsonBtn.addEventListener('click', handlePasteImport);
-    if (copyPromptBtn) {
-        copyPromptBtn.addEventListener('click', copyPromptToClipboard);
-    }
+    
+    importExamsFileBtn.addEventListener('click', handleFileImport);
 
     try {
         // 1. Check for custom exams in localStorage
@@ -415,25 +403,27 @@ async function initialize() {
             // Show a message prompting import
             countdownContainer.innerHTML = '<p>No schedule loaded. Please import your exams using the options below.</p>';
             // Automatically show the import UI
-            toggleImportUI(); 
+            toggleImportUI();
         }
 
         // 3. Check for saved selection (only relevant if custom exams were loaded)
         if (allExams.length > 0) {
-             const selectedCodes = getSelectedExams();
-             if (selectedCodes === null) {
-                 // Custom data exists, but no selection made yet
-                 showSelectionModal();
-             } else {
-                 // User has a saved selection for the loaded custom data
-                 renderCountdowns();
-                 startTimerUpdates();
-             }
+            const selectedCodes = getSelectedExams();
+            if (selectedCodes === null) {
+                // Custom data exists, but no selection made yet
+                showSelectionModal();
+            } else {
+                // User has a saved selection for the loaded custom data
+                renderCountdowns();
+                startTimerUpdates();
+            }
         }
         // Don't show modal or render if allExams is empty
 
         // Add event listener for the save button inside the modal
         saveSelectionBtn.addEventListener('click', handleSaveSelection);
+        
+        checkAllExamsCheckbox.addEventListener('change', markAllExamsForSelection);
 
     } catch (error) {
         // This catch block might now only catch errors during initialization logic itself,
@@ -450,5 +440,4 @@ initialize();
 function toggleImportUI() {
     const isHidden = importControlsDiv.style.display === 'none';
     importControlsDiv.style.display = isHidden ? 'flex' : 'none'; // Use flex as defined in CSS
-    llmPromptSectionDiv.style.display = isHidden ? 'block' : 'none'; // Use block for this section
 }
