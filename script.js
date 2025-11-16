@@ -134,7 +134,7 @@ function handleJSONImport(event) {
 // --- UI Interaction ---
 function showSelectionModal() {
     examCheckboxesContainer.innerHTML = ''; // Clear previous checkboxes
-    const currentSelected = getSelectedExams().slice() || []; // Get previously selected if any
+    const currentSelected = getSelectedExams() || []; // Get previously selected if any
 
     allExams
         .sort((a, b) => parseDate(a.date, a.time) - parseDate(b.date, b.time)) // Sort for display
@@ -168,7 +168,7 @@ function handleSaveSelection() {
 function renderCountdowns() {
     countdownContainer.innerHTML = ''; // Clear existing content
     const now = new Date();
-    const selectedCodes = getSelectedExams().slice();
+    const selectedCodes = getSelectedExams();
 
     if (!selectedCodes) {
         // Should not happen if initialization logic is correct, but safeguard
@@ -236,7 +236,7 @@ function renderCountdowns() {
 // --- Timer Update Logic ---
 function updateTimers() {
     const now = new Date();
-    const selectedCodes = getSelectedExams().slice();
+    const selectedCodes = getSelectedExams();
     if (!selectedCodes) return; // No selection, nothing to update
 
     selectedCodes.forEach(code => {
@@ -262,7 +262,7 @@ function startTimerUpdates() {
     if (updateInterval) {
         clearInterval(updateInterval);
     }
-    const selectedCodes = getSelectedExams().slice();
+    const selectedCodes = getSelectedExams();
     // Only start interval if there are selected exams
     if (selectedCodes && selectedCodes.length > 0) {
         updateTimers(); // Update immediately
@@ -380,7 +380,7 @@ function markAllExamsForSelection(){
 }
 
 function getSelectedExamsData() {
-    const selectedCodes = getSelectedExams().slice();
+    const selectedCodes = getSelectedExams();
     selectedExamsData = [];
     allExams
     .filter(exam => selectedCodes.includes(exam.code))
@@ -469,7 +469,7 @@ function swapMonthAndDay(examDate) {
 
 async function exportToGoogleCalendar() {
     output = "Subject, Start date, Start time, Location\n";
-    const selectedExamsData = getSelectedExamsData().slice();
+    const selectedExamsData = getSelectedExamsData();
     selectedExamsData.forEach(exam => {
         exam.name = prepareExamTitle(exam.code, exam.name);
         exam.date = swapMonthAndDay(convertExamDateToGoogleCalendarFormat(exam.date)); 
@@ -525,7 +525,7 @@ async function initialize() {
 
         // 3. Check for saved selection (only relevant if custom exams were loaded)
         if (allExams.length > 0) {
-            const selectedCodes = getSelectedExams().slice();
+            const selectedCodes = getSelectedExams();
             if (selectedCodes === null) {
                 // Custom data exists, but no selection made yet
                 showSelectionModal();
