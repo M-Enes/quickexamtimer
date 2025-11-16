@@ -10,6 +10,7 @@ const showImportUiBtn = document.getElementById('show-import-ui-btn');
 const importControlsDiv = document.querySelector('.import-controls'); // Get the div itself
 const importFileInput = document.getElementById('import-exams-file'); // File input for importing exams
 const checkAllExamsCheckbox = document.getElementById('check-all-exams'); // Checkbox to select all exams
+const exportToGoogleCalendarBtn = document.getElementById('export-to-google-calendar-btn');
 
 
 // Global variable to hold all fetched exams
@@ -61,7 +62,7 @@ function saveCustomExams(examsData) {
     }
 }
 
-function clearCustomExams() {
+function clearSchedule() {
     localStorage.removeItem(CUSTOM_EXAMS_KEY);
     localStorage.removeItem(SELECTED_EXAMS_KEY);
     alert("Schedule cleared. Please import your exam schedule.");
@@ -78,7 +79,7 @@ function clearCustomExams() {
 }
 
 // --- File Import Logic ---
-function handleFileImport(event) {
+function handleJSONImport(event) {
     const file = event.target.files[0];
     if (!file) {
         return; // No file selected
@@ -132,7 +133,7 @@ function handleFileImport(event) {
 // --- UI Interaction ---
 function showSelectionModal() {
     examCheckboxesContainer.innerHTML = ''; // Clear previous checkboxes
-    const currentSelected = getSelectedExams() || []; // Get previously selected if any
+    const currentSelected = getSelectedExams().slice() || []; // Get previously selected if any
 
     allExams
         .sort((a, b) => parseDate(a.date, a.time) - parseDate(b.date, b.time)) // Sort for display
@@ -158,6 +159,7 @@ function handleSaveSelection() {
     saveSelectedExams(selectedCodes);
     selectionModal.style.display = 'none';
     renderCountdowns(); // Re-render with the new selection
+    showExportToGoogleCalendarBtnIfSelectedExamsExist();
     startTimerUpdates(); // Start or restart the timer updates
 }
 
@@ -165,7 +167,7 @@ function handleSaveSelection() {
 function renderCountdowns() {
     countdownContainer.innerHTML = ''; // Clear existing content
     const now = new Date();
-    const selectedCodes = getSelectedExams();
+    const selectedCodes = getSelectedExams().slice();
 
     if (!selectedCodes) {
         // Should not happen if initialization logic is correct, but safeguard
@@ -232,7 +234,7 @@ function renderCountdowns() {
 // --- Timer Update Logic ---
 function updateTimers() {
     const now = new Date();
-    const selectedCodes = getSelectedExams();
+    const selectedCodes = getSelectedExams().slice();
     if (!selectedCodes) return; // No selection, nothing to update
 
     selectedCodes.forEach(code => {
@@ -258,7 +260,7 @@ function startTimerUpdates() {
     if (updateInterval) {
         clearInterval(updateInterval);
     }
-    const selectedCodes = getSelectedExams();
+    const selectedCodes = getSelectedExams().slice();
     // Only start interval if there are selected exams
     if (selectedCodes && selectedCodes.length > 0) {
         updateTimers(); // Update immediately
@@ -331,7 +333,7 @@ function importFromJSON(data) {
     }
 }
 
-function handleFileImport() {
+function handleJSONImport() {
     {
         const reader = new FileReader();
 
@@ -375,6 +377,119 @@ function markAllExamsForSelection(){
     checkboxes.forEach(cb => cb.checked = checkAllExamsCheckbox.checked);
 }
 
+function getSelectedExamsData() {
+    const selectedCodes = getSelectedExams().slice();
+    selectedExamsData = [];
+    allExams
+    .filter(exam => selectedCodes.includes(exam.code))
+    .forEach(exam => selectedExamsData.push(JSON.parse(JSON.stringify(exam))));
+    return selectedExamsData;
+}
+
+function convertExamDateToGoogleCalendarFormat(examDate) {
+    return examDate.replaceAll('.', '/');
+}
+
+function convertExamTimeToGoogleCalendarFormat(examTime) {
+    const isPm = parseInt(examTime.split(':')[0]) >= 12;
+    if (isPm) {
+        examTime += " PM";
+    } else{
+        examTime += " AM";
+    }
+    return examTime;
+}
+
+// https://web.dev/patterns/files/save-a-file
+async function saveFile(blob, suggestedName) {
+    // Feature detection. The API needs to be supported
+    // and the app not run in an iframe.
+    const supportsFileSystemAccess =
+        'showSaveFilePicker' in window &&
+        (() => {
+            try {
+                return window.self === window.top;
+            } catch {
+                return false;
+            }
+        })();
+    // If the File System Access API is supported…
+    if (supportsFileSystemAccess) {
+        try {
+            // Show the file save dialog.
+            const handle = await showSaveFilePicker({
+                suggestedName,
+            });
+            // Write the blob to the file.
+            const writable = await handle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+            return;
+        } catch (err) {
+            // Fail silently if the user has simply canceled the dialog.
+            if (err.name !== 'AbortError') {
+                console.error(err.name, err.message);
+            }
+            return;
+        }
+    }
+    // Fallback if the File System Access API is not supported…
+    // Create the blob URL.
+    const blobURL = URL.createObjectURL(blob);
+    // Create the `<a download>` element and append it invisibly.
+    const a = document.createElement('a');
+    a.href = blobURL;
+    a.download = suggestedName;
+    a.style.display = 'none';
+    document.body.append(a);
+    // Programmatically click the element.
+    a.click();
+    // Revoke the blob URL and remove the element.
+    setTimeout(() => {
+        URL.revokeObjectURL(blobURL);
+        a.remove();
+    }, 1000);
+};
+
+function prepareSubjectForGoogleCalendarEvent(examCode, examName) {
+    newName = examCode;
+    if (examName != "") {
+        newName += "-";
+    }
+    newName += examName;
+    return newName;
+}
+
+function swapMonthAndDay(examDate) {
+    const examDateArray = examDate.split('/');
+    return examDateArray[1] + "/" + examDateArray[0] + "/" + examDateArray[2];
+}
+
+async function exportToGoogleCalendar() {
+    output = "Subject, Start date, Start time, Location\n";
+    const selectedExamsData = getSelectedExamsData().slice();
+    selectedExamsData.forEach(exam => {
+        exam.name = prepareSubjectForGoogleCalendarEvent(exam.code, exam.name);
+        exam.date = swapMonthAndDay(convertExamDateToGoogleCalendarFormat(exam.date)); 
+        exam.time = convertExamTimeToGoogleCalendarFormat(exam.time);
+    });
+    selectedExamsData.forEach(exam => {
+        output += `"${exam.name}","${exam.date}","${exam.time}","${exam.classes}"\n`;
+    });
+
+    const blob = new Blob([output], {type: 'text/csv;charset=utf-8'});
+    await saveFile(blob, "exams.csv");
+
+}
+
+function showExportToGoogleCalendarBtnIfSelectedExamsExist() {
+    if (getSelectedExams() && getSelectedExams().length > 0) {
+         exportToGoogleCalendarBtn.style.display = 'flex'; // Use flex as defined in CSS
+    } else {
+        exportToGoogleCalendarBtn.style.display = 'none';
+    }
+}
+
 // --- Initialization ---
 async function initialize() {
     // Add event listeners
@@ -382,13 +497,13 @@ async function initialize() {
     // Ensure correct reset button is targeted if multiple exist, assuming the one in import-controls is the relevant one now
     const resetButtonInImport = importControlsDiv.querySelector('#reset-exams-btn');
     if (resetButtonInImport) {
-        resetButtonInImport.addEventListener('click', clearCustomExams);
+        resetButtonInImport.addEventListener('click', clearSchedule);
     } else {
         console.warn("Could not find reset button inside import controls.");
         // Fallback or handle error if needed
     }
     
-    importExamsFileBtn.addEventListener('click', handleFileImport);
+    importExamsFileBtn.addEventListener('click', handleJSONImport);
 
     try {
         // 1. Check for custom exams in localStorage
@@ -408,7 +523,7 @@ async function initialize() {
 
         // 3. Check for saved selection (only relevant if custom exams were loaded)
         if (allExams.length > 0) {
-            const selectedCodes = getSelectedExams();
+            const selectedCodes = getSelectedExams().slice();
             if (selectedCodes === null) {
                 // Custom data exists, but no selection made yet
                 showSelectionModal();
@@ -420,10 +535,15 @@ async function initialize() {
         }
         // Don't show modal or render if allExams is empty
 
+        showExportToGoogleCalendarBtnIfSelectedExamsExist();
+
         // Add event listener for the save button inside the modal
         saveSelectionBtn.addEventListener('click', handleSaveSelection);
         
         checkAllExamsCheckbox.addEventListener('change', markAllExamsForSelection);
+
+        exportToGoogleCalendarBtn.addEventListener('click', exportToGoogleCalendar);
+
 
     } catch (error) {
         // This catch block might now only catch errors during initialization logic itself,
