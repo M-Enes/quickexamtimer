@@ -76,6 +76,7 @@ function clearSchedule() {
     // Do not automatically show selection modal here
     // Hide the import UI if it was open
     importControlsDiv.style.display = 'none';
+    showExportToGoogleCalendarBtnIfSelectedExamsExist();
 }
 
 // --- File Import Logic ---
