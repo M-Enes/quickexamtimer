@@ -198,7 +198,8 @@ function renderCountdowns() {
         card.id = `card-${exam.code}`; // Add ID for easier update targeting
 
         const title = document.createElement('h2');
-        title.textContent = `${exam.code} - ${exam.name}`;
+        const titleText = prepareExamTitle(exam.code, exam.name);
+        title.textContent = titleText;
         card.appendChild(title);
 
         const dateInfo = document.createElement('p');
@@ -451,7 +452,7 @@ async function saveFile(blob, suggestedName) {
     }, 1000);
 };
 
-function prepareSubjectForGoogleCalendarEvent(examCode, examName) {
+function prepareExamTitle(examCode, examName) {
     newName = examCode;
     if (examName != "") {
         newName += "-";
@@ -469,7 +470,7 @@ async function exportToGoogleCalendar() {
     output = "Subject, Start date, Start time, Location\n";
     const selectedExamsData = getSelectedExamsData().slice();
     selectedExamsData.forEach(exam => {
-        exam.name = prepareSubjectForGoogleCalendarEvent(exam.code, exam.name);
+        exam.name = prepareExamTitle(exam.code, exam.name);
         exam.date = swapMonthAndDay(convertExamDateToGoogleCalendarFormat(exam.date)); 
         exam.time = convertExamTimeToGoogleCalendarFormat(exam.time);
     });
